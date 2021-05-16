@@ -1,0 +1,8 @@
+[package]
+name = "text-recovery"
+version = "0.1.0"
+authors = ["Robin Lindner <robin@deeprobin.de>"]
+edition = "2018"
+
+[dependencies]
+image = "0.23.14"
