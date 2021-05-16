@@ -14,8 +14,17 @@ mod tests {
 pub struct Rectangle {
     pub x: u32,
     pub y: u32,
-    pub width: u32,
-    pub height: u32,
+    pub end_x: u32,
+    pub end_y: u32,
+}
+
+impl Rectangle {
+    pub fn width(&self) -> u32 {
+        self.end_x - self.x
+    }
+    pub fn height(&self) -> u32 {
+        self.end_y - self.y
+    }
 }
 
 #[derive(Copy, Debug, Clone, PartialEq, Eq, Hash)]
@@ -39,7 +48,7 @@ pub fn find_same_color_rectangle(
     max_y: u32,
 ) -> ColoredRectangle {
     let color = image.get_pixel(start_x, start_y).to_rgba();
-    
+
     let mut width = 0u32;
     let mut height = 0u32;
 
@@ -70,8 +79,8 @@ pub fn find_same_color_rectangle(
                     rectangle: Rectangle {
                         x: start_x,
                         y: start_y,
-                        width: test_x,
-                        height: test_y,
+                        end_x: test_x,
+                        end_y: test_y,
                     },
                 };
             }
@@ -83,18 +92,21 @@ pub fn find_same_color_rectangle(
         rectangle: Rectangle {
             x: start_x,
             y: start_y,
-            width: start_x + width,
-            height: start_y + height,
+            end_x: start_x + width,
+            end_y: start_y + height,
         },
     }
 }
 
-pub fn find_same_color_sub_rectangles(image: &DynamicImage, rectangle: Rectangle) -> Vec<ColoredRectangle> {
+pub fn find_same_color_sub_rectangles(
+    image: &DynamicImage,
+    rectangle: Rectangle,
+) -> Vec<ColoredRectangle> {
     let mut same_color_rectangles: Vec<ColoredRectangle> = Vec::new();
 
     let mut x = rectangle.x;
-    let max_x = rectangle.x + rectangle.width + 1;
-    let max_y = rectangle.y + rectangle.height + 1;
+    let max_x = rectangle.x + rectangle.end_x + 1;
+    let max_y = rectangle.y + rectangle.end_y + 1;
 
     while x < max_x {
         let mut y = rectangle.y;
@@ -105,12 +117,19 @@ pub fn find_same_color_sub_rectangles(image: &DynamicImage, rectangle: Rectangle
             same_color_rectangles.push(rect);
 
             // logging.info("Found rectangle at (%s, %s) with size (%s,%s) and color %s" % (x, y, sameColorRectange.width,sameColorRectange.height,sameColorRectange.color))
-			println!("Found rectangle at ({}, {}) with size ({},{}) and color {:?}", rect.rectangle.x, rect.rectangle.y, rect.rectangle.width, rect.rectangle.height, rect.color.0);
+            println!(
+                "Found rectangle at ({}, {}) with size ({},{}) and color {:?}",
+                rect.rectangle.x,
+                rect.rectangle.y,
+                rect.rectangle.width(),
+                rect.rectangle.height(),
+                rect.color.0
+            );
 
-            y += rect.rectangle.height;
+            y += rect.rectangle.height();
         }
         if let Some(rect) = same_color_rectangle {
-            x += rect.rectangle.width;
+            x += rect.rectangle.width();
         }
     }
     same_color_rectangles
@@ -154,8 +173,8 @@ pub fn find_rectangle_size_occurences(vec: Vec<ColoredRectangle>) -> HashMap<(u3
 
     for color_rectangle in vec {
         let size = (
-            color_rectangle.rectangle.width,
-            color_rectangle.rectangle.height,
+            color_rectangle.rectangle.width(),
+            color_rectangle.rectangle.height(),
         );
 
         match map.get_mut(&size) {
@@ -209,8 +228,8 @@ pub fn find_rectangle_matches(
         let mut matching_rectangles: Vec<ColoredRectangle> = Vec::new();
         for color_rectangle in &pixelated_sub_rectangles {
             if (
-                color_rectangle.rectangle.width,
-                color_rectangle.rectangle.height,
+                color_rectangle.rectangle.width(),
+                color_rectangle.rectangle.height(),
             ) == rectangle_size
             {
                 matching_rectangles.push(*color_rectangle);
@@ -271,10 +290,16 @@ pub fn find_rectangle_matches(
 
                 for matching_rectangle in &matching_rectangles {
                     if !rectangle_matches.iter().any(|m| {
-                        m.0.0 == matching_rectangle.rectangle.x
-                            && m.0.1 == matching_rectangle.rectangle.y
+                        m.0 .0 == matching_rectangle.rectangle.x
+                            && m.0 .1 == matching_rectangle.rectangle.y
                     }) {
-                        rectangle_matches.insert((matching_rectangle.rectangle.x, matching_rectangle.rectangle.y), Vec::new());
+                        rectangle_matches.insert(
+                            (
+                                matching_rectangle.rectangle.x,
+                                matching_rectangle.rectangle.y,
+                            ),
+                            Vec::new(),
+                        );
                     }
 
                     if (
@@ -288,14 +313,21 @@ pub fn find_rectangle_matches(
                             y: matching_rectangle.rectangle.y,
                             data: match_data.clone(),
                         };
-                        if let Some(m) = rectangle_matches.get_mut(&(matching_rectangle.rectangle.x, matching_rectangle.rectangle.y)) {
+                        if let Some(m) = rectangle_matches.get_mut(&(
+                            matching_rectangle.rectangle.x,
+                            matching_rectangle.rectangle.y,
+                        )) {
                             m.push(new_rectangle_match);
                         }
                     }
                 }
             }
             if x % 64 == 0 {
-                println!("Scanning in searchImage {}/{}", x, search_image.width() - rectangle_width);
+                println!(
+                    "Scanning in searchImage {}/{}",
+                    x,
+                    search_image.width() - rectangle_width
+                );
             }
         }
     }
@@ -314,7 +346,8 @@ pub fn drop_empty_rectangle_matches(
                 pixelated_sub_rectangle.rectangle.x,
                 pixelated_sub_rectangle.rectangle.y,
             ))
-            .unwrap()).len()
+            .unwrap())
+        .len()
             > 0
         {
             new_pixelated_sub_rectangles.push(pixelated_sub_rectangle);
@@ -358,23 +391,22 @@ pub fn split_single_match_and_multiple_matches(
     (single_results, new_pixelated_sub_rectangles)
 }
 
-
 #[inline]
 pub fn is_neighbor(pixel_a: Rectangle, pixel_b: Rectangle) -> bool {
     let x_delta: i32 = pixel_a.x as i32 - pixel_b.x as i32;
     let y_delta: i32 = pixel_a.y as i32 - pixel_b.y as i32;
 
-    let negated_pixel_a_width = -(pixel_a.width as i32);
-    let negated_pixel_a_height = -(pixel_a.height as i32);
+    let negated_pixel_a_width = -(pixel_a.width() as i32);
+    let negated_pixel_a_height = -(pixel_a.height() as i32);
 
     let x_condition =
-        x_delta == pixel_b.width as i32 || x_delta == 0 || x_delta == negated_pixel_a_width;
+        x_delta == pixel_b.width() as i32 || x_delta == 0 || x_delta == negated_pixel_a_width;
     let y_condition =
-        y_delta == pixel_b.height as i32 || y_delta == 0 || y_delta == negated_pixel_a_height;
+        y_delta == pixel_b.height() as i32 || y_delta == 0 || y_delta == negated_pixel_a_height;
 
     x_condition && y_condition && pixel_a != pixel_b
 }
-/* 
+/*
 fn findGeometricMatchesForSingleResults<T0, T1, T2, RT>(
     single_results: Vec<ColoredRectangle>,
     pixelated_sub_rectangles: Vec<ColoredRectangle>,
@@ -433,7 +465,7 @@ fn findGeometricMatchesForSingleResults<T0, T1, T2, RT>(
 pub fn find_geometric_matches_for_single_results(
     single_results: Vec<ColoredRectangle>,
     pixelated_sub_rectangles: Vec<ColoredRectangle>,
-    rectangle_matches: HashMap<(u32, u32), Vec<RectangleMatch>>
+    rectangle_matches: HashMap<(u32, u32), Vec<RectangleMatch>>,
 ) -> (Vec<ColoredRectangle>, Vec<ColoredRectangle>) {
     let mut new_pixelated_sub_rectangles = pixelated_sub_rectangles.clone();
     let mut new_single_results = single_results.clone();
@@ -445,14 +477,23 @@ pub fn find_geometric_matches_for_single_results(
             if !is_neighbor(single_result.rectangle, pixelated_sub_rectangle.rectangle) {
                 continue;
             }
-            if match_count.contains_key(pixelated_sub_rectangle) && match_count.get(pixelated_sub_rectangle).unwrap() > &1 {
+            if match_count.contains_key(pixelated_sub_rectangle)
+                && match_count.get(pixelated_sub_rectangle).unwrap() > &1
+            {
                 break;
             }
 
-            for single_result_match in &rectangle_matches[&(single_result.rectangle.x, single_result.rectangle.y)] {
-                for compare_match in &rectangle_matches[&(pixelated_sub_rectangle.rectangle.x, pixelated_sub_rectangle.rectangle.y)] {
-                    let x_distance = single_result.rectangle.x - pixelated_sub_rectangle.rectangle.x;
-                    let y_distance = single_result.rectangle.y - pixelated_sub_rectangle.rectangle.y;
+            for single_result_match in
+                &rectangle_matches[&(single_result.rectangle.x, single_result.rectangle.y)]
+            {
+                for compare_match in &rectangle_matches[&(
+                    pixelated_sub_rectangle.rectangle.x,
+                    pixelated_sub_rectangle.rectangle.y,
+                )] {
+                    let x_distance =
+                        single_result.rectangle.x - pixelated_sub_rectangle.rectangle.x;
+                    let y_distance =
+                        single_result.rectangle.y - pixelated_sub_rectangle.rectangle.y;
                     let x_distance_matches = single_result_match.x - compare_match.x;
                     let y_distance_matches = single_result_match.y - compare_match.y;
 
@@ -480,7 +521,10 @@ pub fn find_geometric_matches_for_single_results(
     for pixelated_sub_rectangle in match_count {
         if pixelated_sub_rectangle.1 == 1 {
             new_single_results.push(pixelated_sub_rectangle.0);
-            if let Some(pos) = new_pixelated_sub_rectangles.iter().position(|x| *x == pixelated_sub_rectangle.0) {
+            if let Some(pos) = new_pixelated_sub_rectangles
+                .iter()
+                .position(|x| *x == pixelated_sub_rectangle.0)
+            {
                 new_pixelated_sub_rectangles.remove(pos);
             }
         }
@@ -489,36 +533,56 @@ pub fn find_geometric_matches_for_single_results(
     (new_single_results, new_pixelated_sub_rectangles)
 }
 
-pub fn write_first_match_to_image(single_match_rectangles: Vec<ColoredRectangle>, rectangle_matches: HashMap<(u32, u32), Vec<RectangleMatch>>, search_image: &DynamicImage, unpixelated_output_image: &mut DynamicImage) {
+pub fn write_first_match_to_image(
+    single_match_rectangles: Vec<ColoredRectangle>,
+    rectangle_matches: HashMap<(u32, u32), Vec<RectangleMatch>>,
+    search_image: &DynamicImage,
+    unpixelated_output_image: &mut DynamicImage,
+) {
     for single_result in single_match_rectangles {
-        let single_match = &rectangle_matches[&(single_result.rectangle.x, single_result.rectangle.y)][0];
+        let single_match =
+            &rectangle_matches[&(single_result.rectangle.x, single_result.rectangle.y)][0];
 
-        for x in 0..single_result.rectangle.width {
-            for y in 0..single_result.rectangle.height {
+        for x in 0..single_result.rectangle.width() {
+            for y in 0..single_result.rectangle.height() {
                 let origin_pixel = search_image.get_pixel(single_match.x + x, single_match.y + y);
-                unpixelated_output_image.put_pixel(single_result.rectangle.x + x, single_result.rectangle.y + y, origin_pixel);
+                unpixelated_output_image.put_pixel(
+                    single_result.rectangle.x + x,
+                    single_result.rectangle.y + y,
+                    origin_pixel,
+                );
             }
         }
     }
 }
 
-pub fn write_average_match_to_image(pixelated_sub_rectangles: Vec<ColoredRectangle>, rectangle_matches: HashMap<(u32, u32), Vec<RectangleMatch>>, unpixelated_output_image: &mut DynamicImage) {
+pub fn write_average_match_to_image(
+    pixelated_sub_rectangles: Vec<ColoredRectangle>,
+    rectangle_matches: HashMap<(u32, u32), Vec<RectangleMatch>>,
+    unpixelated_output_image: &mut DynamicImage,
+) {
     for pixelated_sub_rectangle in pixelated_sub_rectangles {
-        let coordinate = (pixelated_sub_rectangle.rectangle.x, pixelated_sub_rectangle.rectangle.y);
+        let coordinate = (
+            pixelated_sub_rectangle.rectangle.x,
+            pixelated_sub_rectangle.rectangle.y,
+        );
         let matches = &rectangle_matches[&coordinate];
 
-        let mut new_image = DynamicImage::new_rgb8(pixelated_sub_rectangle.rectangle.width, pixelated_sub_rectangle.rectangle.height);
+        let mut new_image = DynamicImage::new_rgb8(
+            pixelated_sub_rectangle.rectangle.width(),
+            pixelated_sub_rectangle.rectangle.height(),
+        );
 
         for image_match in matches {
             let mut data_count = 0;
-            for x in 0..pixelated_sub_rectangle.rectangle.width {
-                for y in 0..pixelated_sub_rectangle.rectangle.height {
+            for x in 0..pixelated_sub_rectangle.rectangle.width() {
+                for y in 0..pixelated_sub_rectangle.rectangle.height() {
                     let pixel_data = image_match.data[data_count];
                     data_count += 1;
 
                     // By default white
-                    let current_pixel_color: [u8; 4] = [255; 4]; 
-                    
+                    let current_pixel_color: [u8; 4] = [255; 4];
+
                     let r = pixel_data[0] + current_pixel_color[0] / 2;
                     let g = pixel_data[1] + current_pixel_color[1] / 2;
                     let b = pixel_data[2] + current_pixel_color[2] / 2;
@@ -530,10 +594,14 @@ pub fn write_average_match_to_image(pixelated_sub_rectangles: Vec<ColoredRectang
             }
         }
 
-        for x in 0..pixelated_sub_rectangle.rectangle.width {
-            for y in 0..pixelated_sub_rectangle.rectangle.height {
+        for x in 0..pixelated_sub_rectangle.rectangle.width() {
+            for y in 0..pixelated_sub_rectangle.rectangle.height() {
                 let current_pixel = new_image.get_pixel(x, y);
-                unpixelated_output_image.put_pixel(pixelated_sub_rectangle.rectangle.x, pixelated_sub_rectangle.rectangle.y, current_pixel);
+                unpixelated_output_image.put_pixel(
+                    pixelated_sub_rectangle.rectangle.x,
+                    pixelated_sub_rectangle.rectangle.y,
+                    current_pixel,
+                );
             }
         }
     }
